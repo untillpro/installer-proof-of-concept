@@ -1,0 +1,19 @@
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+tasks.eclipse.dependsOn(cleanEclipse)
+eclipse {
+	classpath {
+		downloadJavadoc = true
+	}
+}
+eclipseJdt.doLast {
+	file('.settings/org.eclipse.core.resources.prefs').write(
+		'eclipse.preferences.version=1\n' +
+		'encoding/<project>=UTF-8\n'
+	)
+}
