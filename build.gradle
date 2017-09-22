@@ -5,6 +5,8 @@ apply plugin: 'eclipse'
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
+ext.mainClass = 'Main'
+
 tasks.eclipse.dependsOn(cleanEclipse)
 eclipse {
 	classpath {
@@ -15,5 +17,11 @@ eclipseJdt.doLast {
 	file('.settings/org.eclipse.core.resources.prefs').write(
 		'eclipse.preferences.version=1\n' +
 		'encoding/<project>=UTF-8\n'
+	)
+}
+
+jar {
+	manifest.attributes (
+		'Main-Class': mainClass
 	)
 }
