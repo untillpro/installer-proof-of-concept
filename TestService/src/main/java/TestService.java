@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.util.StringTokenizer;
 import java.util.logging.FileHandler;
 import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
@@ -73,7 +74,7 @@ public class TestService {
 		try {
 			pb.start();
 		} catch (IOException e) {
-			log.throwing("TestService", "doRun", e);
+			log.log(Level.WARNING, "doRun", e);
 		}
 
 	}

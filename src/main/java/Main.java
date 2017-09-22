@@ -1,96 +1,88 @@
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.logging.FileHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 public class Main {
 
+	private static Logger log = Logger.getLogger(Main.class.getName());
+	private static File jarFile;
+	private static File dstDir;
+	
 	public static void main(String[] args) {
+		jarFile = Main.getJarFile();
+		if (jarFile == null || !jarFile.getPath().toLowerCase().endsWith(".jar")) {
+			System.err.println("This program is started only from jar");
+			System.exit(6);
+		}
+		dstDir = new File(jarFile.getParentFile(), "TestService");
+		try {
+			Handler handler = new FileHandler(jarFile.getPath() + ".%u.log", true);
+			handler.setFormatter(new SimpleFormatter());
+			log.addHandler(handler);
+		} catch (SecurityException | IOException e) {
+			e.printStackTrace();
+			System.exit(3);
+		}
 		String srcPath = args.length > 1 ? args[1]
-				: new File(getJarFile().getParentFile().getParentFile().getParentFile(), "TestService/build/windows-service").getPath();
-		if (args.length > 0) {
-			if ("install".equals(args[0])) {
-				install(srcPath);
-			} else if ("uninstall".equals(args[0])) {
-				uninstall();
-			} else if ("upgrade".equals(args[0])) {
-				upgrade(srcPath);
-			} else if ("rebootAndUpgrade".equals(args[0])) {
-				rebootAndUpgrade(srcPath);
-			} else if ("upgradeAfterReboot".equals(args[0])) {
-				upgradeAfterReboot(srcPath);
+				: new File(jarFile.getParentFile().getParentFile().getParentFile(), "TestService/build/windows-service").getPath();
+		try {
+			if (args.length > 0) {
+				log.info(args[0]);
+				if ("install".equals(args[0])) {
+					install(srcPath);
+				} else if ("uninstall".equals(args[0])) {
+					uninstall();
+				} else if ("upgrade".equals(args[0])) {
+					upgrade(srcPath);
+				} else if ("rebootAndUpgrade".equals(args[0])) {
+					rebootAndUpgrade(srcPath);
+				} else if ("upgradeAfterReboot".equals(args[0])) {
+					upgradeAfterReboot(srcPath);
+				} else
+					printUsage();
 			} else
 				printUsage();
-		} else
-			printUsage();
-	}
-
-	private static void printUsage() {
-		System.out.println("Usage:");
-		System.out.println("\t java -jar " + getJarFile().getName() + " install|uninstall|upgrade|rebootAndUpgrade [srcPath]");
-		System.exit(1);
-	}
-
-	private static void install(String srcPath) {
-		if (!TestServiceInstaller.install(srcPath)) {
-			System.err.println("Error: install");
+		} catch (Exception e) {
+			log.log(Level.SEVERE, args[0], e);
 			System.exit(2);
 		}
 	}
 
-	private static void uninstall() {
-		if (!TestServiceInstaller.uninstall()) {
-			System.err.println("Error: uninstall");
-			System.exit(3);
-		}
+	private static void printUsage() {
+		System.out.println("Usage:");
+		System.out.println("\t java -jar " + jarFile.getName() + " install|uninstall|upgrade|rebootAndUpgrade [srcPath]");
+		System.exit(1);
 	}
 
-	private static void upgrade(String srcPath) {
-		if (!TestServiceInstaller.uninstall()) {
-			System.err.println("Error: upgrade (uninstall)");
-			System.exit(4);
-		}
-		// TODO upgrade
-		if (!TestServiceInstaller.install(srcPath)) {
-			System.err.println("Error: upgrade (install)");
-			System.exit(5);
-		}
+	private static void install(String srcPath) throws Exception {
+		TestServiceInstaller.install(new File(srcPath), dstDir);
 	}
 
-	private static void rebootAndUpgrade(String srcPath) {
-		String jarPath = getJarFile().getPath();
-		if (jarPath == null || !jarPath.toLowerCase().endsWith(".jar")) {
-			System.err.println("Error: this command is available only from jar");
-			System.exit(6);
-		}
+	private static void uninstall() throws Exception {
+		TestServiceInstaller.uninstall(dstDir);
+	}
+
+	private static void upgrade(String srcPath) throws Exception {
+		TestServiceInstaller.uninstall(dstDir);
+		TestServiceInstaller.install(new File(srcPath), dstDir);
+	}
+
+	private static void rebootAndUpgrade(String srcPath) throws Exception {
 		// TODO check for elevated
-		// disable service
-		if (!TestServiceInstaller.disableService()) {
-			System.err.println("Error: disableService");
-			System.exit(7);
-		}
-		// create task
-		int res = exec("schtasks", "/Create", "/TN", "TestTask",
-				"/TR", "java -jar \\\"" + jarPath + "\\\" upgradeAfterReboot",
+		TestServiceInstaller.disableService(dstDir);
+		exec("schtasks", "/Create", "/TN", "TestTask",
+				"/TR", "java -jar \\\"" + jarFile.getPath() + "\\\" upgradeAfterReboot \\\"" + srcPath + "\\\"",
 				"/SC", "ONSTART", "/RU", "SYSTEM");
-		if (res != 0) {
-			System.err.println(String.format("Error: create task (%d)", res));
-			System.exit(8);
-		}
-		// reboot
-		res = exec("shutdown", "-r");
-		if (res != 0) {
-			System.err.println(String.format("Error: reboot (%d)", res));
-			System.exit(9);
-		}
+		exec("shutdown", "-r");
 	}
 
-	private static void upgradeAfterReboot(String srcPath) {
-		// delete task
-		int res = exec("schtasks", "/Delete", "/F", "/TN", "TestTask");
-		if (res != 0) {
-			System.err.println(String.format("Error: delete task (%d)", res));
-			System.exit(10);
-		}
+	private static void upgradeAfterReboot(String srcPath) throws Exception {
+		exec("schtasks", "/Delete", "/F", "/TN", "TestTask");
 		upgrade(srcPath);
 	}
 
@@ -103,15 +95,12 @@ public class Main {
 		}
 	}
 
-	public static int exec(String... command) {
+	public static void exec(String... command) throws Exception {
 		ProcessBuilder pb = new ProcessBuilder(command)
 				.inheritIO();
-		try {
-			Process p = pb.start();
-			return p.waitFor();
-		} catch (IOException | InterruptedException e) {
-			e.printStackTrace();
-			return -1;
-		}
+		Process p = pb.start();
+		int res = p.waitFor();
+		if (res != 0)
+			throw new Exception(String.format("%s: &d", command.toString(), res));
 	}
 }
