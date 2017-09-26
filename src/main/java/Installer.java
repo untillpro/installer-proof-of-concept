@@ -7,14 +7,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
-public class Main {
+public class Installer {
 
-	private static Logger log = Logger.getLogger(Main.class.getName());
+	private static Logger log = Logger.getLogger(Installer.class.getName());
 	private static File jarFile;
 	private static File dstDir;
 	
 	public static void main(String[] args) {
-		jarFile = Main.getJarFile();
+		jarFile = Installer.getJarFile();
 		if (jarFile == null || !jarFile.getPath().toLowerCase().endsWith(".jar")) {
 			System.err.println("This program is started only from jar");
 			System.exit(6);
@@ -29,7 +29,7 @@ public class Main {
 			System.exit(3);
 		}
 		String srcPath = args.length > 1 ? args[1]
-				: new File(jarFile.getParentFile().getParentFile().getParentFile(), "TestService/build/windows-service").getPath();
+				: new File(jarFile.getParentFile().getParentFile(), "windows-service").getPath();
 		try {
 			if (args.length > 0) {
 				log.info(args[0]);
@@ -75,20 +75,20 @@ public class Main {
 	private static void rebootAndUpgrade(String srcPath) throws Exception {
 		// TODO check for elevated
 		TestServiceInstaller.disableService(dstDir);
-		exec("schtasks", "/Create", "/TN", "TestTask",
+		exec("schtasks", "/Create", "/TN", "installer-proof-of-concept",
 				"/TR", "java -jar \\\"" + jarFile.getPath() + "\\\" upgradeAfterReboot \\\"" + srcPath + "\\\"",
 				"/SC", "ONSTART", "/RU", "SYSTEM");
 		exec("shutdown", "-r");
 	}
 
 	private static void upgradeAfterReboot(String srcPath) throws Exception {
-		exec("schtasks", "/Delete", "/F", "/TN", "TestTask");
+		exec("schtasks", "/Delete", "/F", "/TN", "installer-proof-of-concept");
 		upgrade(srcPath);
 	}
 
 	public static File getJarFile() {
 		try {
-			return new File(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
+			return new File(Installer.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
 			return null;

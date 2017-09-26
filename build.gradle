@@ -1,11 +1,21 @@
+buildscript {
+	repositories {
+		maven {
+			url 'https://plugins.gradle.org/m2/'
+		}
+	}
+	dependencies {
+		classpath 'gradle.plugin.com.github.alexeylisyutenko:windows-service-plugin:1.0.1'
+	}
+}
+
 apply plugin: 'java'
 apply plugin: 'eclipse'
+apply plugin: 'com.github.alexeylisyutenko.windows-service-plugin'
 
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
-
-ext.mainClass = 'Main'
 
 tasks.eclipse.dependsOn(cleanEclipse)
 eclipse {
@@ -22,6 +32,19 @@ eclipseJdt.doLast {
 
 jar {
 	manifest.attributes (
-		'Main-Class': mainClass
+		'Main-Class': 'Installer'
 	)
+}
+
+windowsService {
+	architecture = 'x86'
+	displayName = 'TestService'
+	description = 'Service generated for test purposes'
+	startClass = 'TestService'
+	startMethod = 'main'
+	startParams = 'start'
+	stopClass = 'TestService'
+	stopMethod = 'main'
+	stopParams = 'stop'
+	startup = 'auto'
 }
